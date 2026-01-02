@@ -22,6 +22,7 @@ MEMORY_BW_p = 32, MEMORY_DEPTH_p = 1024
 
 ## Integration
 
+- Instantiate the AXI4-Lite Scratchpad with correst MEMORY_BW_p and MEMORY_DEPTH_p parameters
 - Connect clock to the 'clk' port
 - Connect negative logic reset to the 'rst_n' port
 - Connect AXI4-Lite signals
