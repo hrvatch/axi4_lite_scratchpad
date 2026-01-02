@@ -1,0 +1,13 @@
+# Xcelium/Cadence simulation artifacts
+xcelium.d/
+xrun.log
+waves.shm/
+xrun.history
+xrun.key
+.simvision/
+
+# JasperGold artefacts
+jgproject/
+
+# Environment config file
+source.me

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wavelist version="3">
+  <insertion-point-position>18</insertion-point-position>
+  <wave>
+    <expr>clk</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>rst_n</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>o_axi_awready</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>i_axi_awvalid</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave collapsed="true">
+    <expr>i_axi_awaddr</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>o_axi_wready</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>i_axi_wvalid</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave collapsed="true">
+    <expr>i_axi_wdata</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave collapsed="true">
+    <expr>i_axi_wstrb</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>o_axi_bvalid</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>i_axi_bready</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave collapsed="true">
+    <expr>o_axi_bresp</expr>
+    <label/>
+    <radix>o_axi_bresp</radix>
+  </wave>
+  <wave collapsed="true">
+    <expr>write_request_cnt</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave collapsed="true">
+    <expr>write_data_cnt</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>axi_led_dut.s_axi_wdata_buf_used</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>axi_led_dut.s_axi_awaddr_buf_used</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>axi_led_dut.valid_write_address</expr>
+    <label/>
+    <radix/>
+  </wave>
+  <wave>
+    <expr>axi_led_dut.valid_write_data</expr>
+    <label/>
+    <radix/>
+  </wave>
+</wavelist>
