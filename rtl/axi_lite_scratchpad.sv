@@ -1,6 +1,6 @@
-// AXI4-Lite module used to access SRAM.
+// AXI4-Lite module used to a5cess SRAM.
 // Bit-width can be either 32- or 64-bit
-// Depth can be whatever you prefer.
+// Depth MUST be a power of 2.
 //
 // Example 4k scratchpad:
 // MEMORY_BW_p = 32, MEMORY_DEPTH_p = 1024 32-bits = 4 bytes * 1024 rows = 4K
@@ -50,6 +50,10 @@ module axi_lite_scratchpad #(
   localparam int unsigned AXI_ADDR_ALIGNMENT_p = $clog2((MEMORY_BW_p/8));
  
   logic [MEMORY_BW_p-1:0] ram_block [MEMORY_DEPTH_p];
+
+  logic [MEMORY_BW_p-1:0] s_ram_output_register;
+  logic s_ram_output_register_used;
+  logic s_ram_re;
   logic s_ram_we;
 
   // --------------------------------------------------------------
@@ -80,10 +84,6 @@ module axi_lite_scratchpad #(
   // or if the write data buffer is full and master is stalling write response channel
   assign o_axi_wready  = !s_axi_wdata_buf_used & s_axi_wvalid;
   
-  // Simple address decoder
-  logic write_addr_valid;
-  assign write_addr_valid = (c_axi_awaddr[AXI_ADDR_BW_p-1:AXI_ADDR_ALIGNMENT_p] < MEMORY_DEPTH_p);
-
   logic write_response_stalled;
   logic valid_write_address;
   logic valid_write_data;
@@ -128,15 +128,17 @@ module axi_lite_scratchpad #(
   end
 
   // Write to RAM, individual byte-enables
-  generate
-    for (genvar i = 0; i < MEMORY_BW_p/8; i++) begin : ram_write_byte_en
-      always_ff @(posedge clk) begin
-        if (s_ram_we && c_axi_wstrb[i]) begin
-          ram_block[c_axi_awaddr[AXI_ADDR_BW_p-1:AXI_ADDR_ALIGNMENT_p]][i*8 +:8] <= c_axi_wdata[i*8 +: 8];
+  always_ff @(posedge clk) begin
+    // Write with byte enables
+    if (s_ram_we) begin
+      for (int i = 0; i < MEMORY_BW_p/8; i++) begin
+        if (c_axi_wstrb[i]) begin
+          ram_block[c_axi_awaddr[AXI_ADDR_BW_p-1:AXI_ADDR_ALIGNMENT_p]][i*8 +: 8] 
+            <= c_axi_wdata[i*8 +: 8];
         end
       end
     end
-  endgenerate
+  end
 
   // Muxes to select write address and write data either from the buffer or from the AXI bus
   assign c_axi_awaddr = s_axi_awaddr_buf_used ? s_axi_awaddr_buf : i_axi_awaddr;
@@ -152,12 +154,7 @@ module axi_lite_scratchpad #(
       s_ram_we <= 1'b0;
       // If there is write address and write data in the buffer
       if (valid_write_address && valid_write_data && (!o_axi_bvalid || i_axi_bready)) begin
-        if (write_addr_valid) begin 
-          s_ram_we <= 1'b1;
-          s_axi_bresp <= RESP_OKAY;
-        end else begin
-          s_axi_bresp <= RESP_SLVERR;
-        end
+        s_ram_we <= 1'b1;
         s_axi_bvalid <= 1'b1;
       end else if (o_axi_bvalid && i_axi_bready && !(valid_write_address && valid_write_data)) begin
         s_axi_bvalid <= 1'b0;
@@ -166,7 +163,7 @@ module axi_lite_scratchpad #(
   end
   
   // Assign intermediate signals to outputs 
-  assign o_axi_bresp = s_axi_bresp;
+  assign o_axi_bresp = RESP_OKAY;
   assign o_axi_bvalid = s_axi_bvalid;
   
   // --------------------------------------------------------------
@@ -174,64 +171,127 @@ module axi_lite_scratchpad #(
   // --------------------------------------------------------------
   logic s_axi_rvalid;
   logic [AXI_DATA_BW_p-1:0] s_axi_rdata;
-  logic [1:0] s_axi_rresp;
   logic s_axi_arready;
 
   // Read address buffer
-  logic [AXI_ADDR_BW_p-1:0] s_araddr_buf;
-  logic s_araddr_buf_used;
-  logic [AXI_ADDR_BW_p-1:0] c_axi_araddr;
+  logic [2:0] s_rdata_credit_counter;
 
   // Address buffer management
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      s_araddr_buf_used <= 1'b0;
+      s_rdata_credit_counter <= 3'b000;
       s_axi_arready <= 1'b0;
     end else begin
       s_axi_arready <= 1'b1;
-
-      // Fill buffer when response is stalled
-      if (i_axi_arvalid && o_axi_arready && o_axi_rvalid && !i_axi_rready) begin
-        s_araddr_buf <= i_axi_araddr;
-        s_araddr_buf_used <= 1'b1;
+      if ((i_axi_arvalid && o_axi_arready) && !(o_axi_rvalid && i_axi_rready)) begin
+        s_rdata_credit_counter <= s_rdata_credit_counter + 1'b1;
+      end else if (!(i_axi_arvalid && o_axi_arready) && (o_axi_rvalid && i_axi_rready)) begin
+        s_rdata_credit_counter <= s_rdata_credit_counter - 1'b1; 
       end 
-      // Clear buffer when address is consumed
-      else if (s_araddr_buf_used && (!o_axi_rvalid || i_axi_rready)) begin
-        s_araddr_buf_used <= 1'b0;
+    end
+  end
+
+  // Ready signal blocks when buffer full
+  assign o_axi_arready = (s_rdata_credit_counter <= 'd4) & s_axi_arready;
+  
+  // Write enable when we have address read request
+  assign s_ram_re = i_axi_arvalid && o_axi_arready; 
+ 
+  // Reading from RAM
+  logic [MEMORY_BW_p-1:0] ram_output;
+  logic s_ram_re_stage1;
+  always_ff @(posedge clk) begin
+    if (s_ram_re) begin
+      ram_output <= ram_block[i_axi_araddr[AXI_ADDR_BW_p-1:AXI_ADDR_ALIGNMENT_p]];
+    end
+  end
+
+  always_ff @(posedge clk) begin
+    s_ram_output_register <= ram_output;
+  end
+
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      s_ram_re_stage1 <= 1'b0;
+    end else begin
+      s_ram_re_stage1 <= s_ram_re;
+    end
+  end
+  
+  logic [MEMORY_BW_p-1:0] rdata_fifo[2];
+  logic [1:0] rdata_wr_ptr;
+  logic [1:0] rdata_rd_ptr;
+  logic rdata_fifo_full;
+  logic rdata_fifo_empty;
+
+  // Clear register_used: when data actually consumed
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      s_ram_output_register_used <= 1'b0;
+    end else begin
+      if (s_ram_re_stage1) begin
+        s_ram_output_register_used <= 1'b1;
+      end else if (s_ram_output_register_used) begin
+        // Consumed directly (FIFO empty, output free)
+        if (rdata_fifo_empty && (!o_axi_rvalid || i_axi_rready)) begin
+          s_ram_output_register_used <= 1'b0;
+        end
+        // Buffered to FIFO
+        else if (!rdata_fifo_full && (!rdata_fifo_empty || (o_axi_rvalid && !i_axi_rready))) begin
+          s_ram_output_register_used <= 1'b0;
+        end
       end
     end
   end
 
-  // Mux to select address 
-  assign c_axi_araddr = s_araddr_buf_used ? s_araddr_buf : i_axi_araddr;
+  assign rdata_fifo_empty = (rdata_wr_ptr == rdata_rd_ptr);
+  assign rdata_fifo_full = ((rdata_wr_ptr[0] == rdata_rd_ptr[0]) && 
+                            (rdata_wr_ptr[1] != rdata_rd_ptr[1]));
 
-  // Ready signal blocks when buffer full
-  assign o_axi_arready = !s_araddr_buf_used & s_axi_arready;
-
-  // Response generation
+  // Read data bufer management
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      s_axi_rvalid <= 1'b0;
+      rdata_wr_ptr <= 2'b0;
+      rdata_rd_ptr <= 2'b0;
     end else begin
-      // Generate response when address is available (buffer or direct)
-      if ((s_araddr_buf_used || (i_axi_arvalid && o_axi_arready)) && (!o_axi_rvalid || i_axi_rready)) begin
-        if (c_axi_araddr[AXI_ADDR_BW_p-1:AXI_ADDR_ALIGNMENT_p] < MEMORY_DEPTH_p) begin
-          s_axi_rdata <= ram_block[c_axi_araddr[AXI_ADDR_BW_p-1:AXI_ADDR_ALIGNMENT_p]];
-          s_axi_rresp <= RESP_OKAY;
-        end else begin
-          s_axi_rdata <= 'hdeaddead;
-          s_axi_rresp <= RESP_SLVERR;
-        end
+      // Write: only if output path is blocked (NOT if we can send directly)
+      if (s_ram_output_register_used && !rdata_fifo_full &&
+          (!rdata_fifo_empty || (o_axi_rvalid && !i_axi_rready))) begin
+        rdata_wr_ptr <= rdata_wr_ptr + 1'b1;
+        rdata_fifo[rdata_wr_ptr[0]] <= s_ram_output_register;
+      end 
+      
+      // Read: drain FIFO (independent)
+      if (!rdata_fifo_empty && (!o_axi_rvalid || i_axi_rready)) begin
+        rdata_rd_ptr <= rdata_rd_ptr + 1'b1;
+      end
+    end
+  end
+
+  // Output: FIFO has priority, THEN direct from register
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      s_axi_rvalid <= 1'b0;    
+    end else begin
+      // Priority 1: FIFO (drain first to maintain order)
+      if (!rdata_fifo_empty && (!o_axi_rvalid || i_axi_rready)) begin
+        s_axi_rdata <= rdata_fifo[rdata_rd_ptr[0]];
         s_axi_rvalid <= 1'b1;
-      // Clear response when handshake completes and no new transaction
-      end else if (o_axi_rvalid && i_axi_rready && !s_araddr_buf_used && !(i_axi_arvalid && o_axi_arready)) begin
+      end 
+      // Priority 2: Direct (only if FIFO empty AND output available)
+      else if (rdata_fifo_empty && s_ram_output_register_used && (!o_axi_rvalid || i_axi_rready)) begin
+        s_axi_rdata <= s_ram_output_register;
+        s_axi_rvalid <= 1'b1;
+      end 
+      // Clear RVALID when done
+      else if (!s_ram_output_register_used && rdata_fifo_empty && o_axi_rvalid && i_axi_rready) begin
         s_axi_rvalid <= 1'b0;
       end
     end
   end
-
+  
   assign o_axi_rdata = s_axi_rdata;
-  assign o_axi_rresp = s_axi_rresp;
+  assign o_axi_rresp = RESP_OKAY;
   assign o_axi_rvalid = s_axi_rvalid;
 
 endmodule : axi_lite_scratchpad

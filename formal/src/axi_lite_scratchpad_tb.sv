@@ -81,8 +81,8 @@ module axi_lite_scratchpad_tb #(
     end
   end
 
-  // There should be at most one read request being served and one in the buffer - two in total
-  assert_valid_number_of_read_requests : assert property ( read_request_cnt >= 0 && read_request_cnt <= 2);
+  // 4 read requests at most
+  assert_valid_number_of_read_requests : assert property ( read_request_cnt >= 0 && read_request_cnt <= 5);
   
   // Auxilliary logic for write requests and write data
   int write_request_cnt;
@@ -124,15 +124,25 @@ module axi_lite_scratchpad_tb #(
     (i_axi_arvalid && o_axi_arready)[*5]
   );
 
+  // Cover 5 consecutive read responses
+  cov_5_consecutive_read_responses : cover property (
+    (o_axi_rvalid && i_axi_rready)[*5]
+  );
+
   // Cover buffer filling and emptying
   cover_read_buffer_empty_full_empty : cover property (
-    read_request_cnt == 0 ##1 read_request_cnt == 1 ##1 read_request_cnt == 2 ##1
+    read_request_cnt == 0 ##1 read_request_cnt == 1 ##1 read_request_cnt == 2 ##[1:2]
     read_request_cnt == 1 ##1 read_request_cnt == 0
   );
 
   // Cover 5 consecutive write requests
   cov_5_consecutive_write_requests : cover property (
     (i_axi_awvalid && o_axi_awready)[*5]
+  );
+
+  // Cover 5 consecutive write responses
+  cov_5_consecutive_write_responses : cover property (
+    (o_axi_bvalid && i_axi_bready)[*5]
   );
 
   // Cover buffer filling and emptying
