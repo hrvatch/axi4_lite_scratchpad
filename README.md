@@ -11,8 +11,16 @@ clock-cycle via the AXI4 bus, or reads on every clock cycle via the AXI4 bus, i.
 
 Scratchpad supports writing to the individual bytes, i.e. AXI4-Lite strobes are supported.
 
-If the RAM depth is not a power-of-two, it's possible to access address space inside the 
-AXI4-Scratchpad that is unassigned. The slave will generate AXI4 SLVERR if that is the case.
+RAM **MUST** be a power of two to function correctly.
+
+To achieve maximum speed and timing in Vivado, an output register to the RAM was added, causing
+BRAM to have 2 clock cycles of latency in total. If we take into account that one clock cycle
+of latency is required for read request, this makes reads to take 3 clock cycles in total.
+
+To achieve maximum throughput an output FIFO was added. I used couple of ideas from differents
+sources:
+1. [Credit based flow control](https://verilog-meetup.com/2025/02/11/credit-based-flow-control)
+2. [Simulation and Synthesis Techniques for Asynchronous FIFO Design with Asynchronous Pointer Comparisons](https://www.researchgate.net/publication/237612566_Simulation_and_Synthesis_Techniques_for_Asynchronous_FIFO_Design_with_Asynchronous_Pointer_Comparisons/link/54bfe9750cf28a6324a007ea/download?_tp=eyJjb250ZXh0Ijp7ImZpcnN0UGFnZSI6InB1YmxpY2F0aW9uIiwicGFnZSI6InB1YmxpY2F0aW9uIn19)
 
 ## Example 4k Scratchpad
 
