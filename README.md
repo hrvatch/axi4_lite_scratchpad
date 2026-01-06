@@ -83,3 +83,26 @@ int main(void) {
 }
 
 ```
+
+## Utilization report
+
+NOTE: Utilization report is from a standalone synthesis in Vivado. It's possible less resources
+would be used once the design is integrated into a larger block.
+
++----------+------+---------------------+
+| Ref Name | Used | Functional Category |
++----------+------+---------------------+
+| FDRE     |   92 |        Flop & Latch |
+| LUT3     |   79 |                 LUT |
+| IBUF     |   63 |                  IO |
+| OBUF     |   41 |                  IO |
+| RAMD32   |   34 |  Distributed Memory |
+| RAMS32   |   10 |  Distributed Memory |
+| LUT6     |   10 |                 LUT |
+| LUT5     |    8 |                 LUT |
+| LUT2     |    5 |                 LUT |
+| LUT4     |    4 |                 LUT |
+| RAMB36E1 |    1 |        Block Memory |
+| LUT1     |    1 |                 LUT |
+| BUFG     |    1 |               Clock |
++----------+------+---------------------+
