@@ -17,7 +17,7 @@
 module axi_lite_scratchpad #(
   parameter int unsigned MEMORY_BW_p = 32,      // Can be either 32- or 64-bit
   parameter int unsigned MEMORY_DEPTH_p = 1024, // 4k SRAM by default
-  parameter string MEM_FILE_p = "firmware.hex"  // Can be used by Vivado prefill BRAM
+  parameter string MEM_FILE_p = ""              // Can be used by Vivado prefill BRAM
 ) (
   input logic  clk,
   input logic  rst_n,
@@ -54,7 +54,9 @@ module axi_lite_scratchpad #(
 
   `ifndef SIM
   initial begin
-    $readmemh(MEM_FILE_p, ram_block);
+    if (MEM_FILE_p != "") begin
+      $readmemh(MEM_FILE_p, ram_block);
+    end
   end 
   `endif
 
