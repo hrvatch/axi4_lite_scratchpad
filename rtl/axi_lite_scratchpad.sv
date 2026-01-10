@@ -15,8 +15,9 @@
 // does not mandate ordering between read and write channels (but still it's annoying).
 
 module axi_lite_scratchpad #(
-  parameter int unsigned MEMORY_BW_p = 32,     // Can be either 32- or 64-bit
-  parameter int unsigned MEMORY_DEPTH_p = 1024 // 4k SRAM by default
+  parameter int unsigned MEMORY_BW_p = 32,      // Can be either 32- or 64-bit
+  parameter int unsigned MEMORY_DEPTH_p = 1024, // 4k SRAM by default
+  parameter string MEM_FILE_p = "firmware.hex"  // Can be used by Vivado prefill BRAM
 ) (
   input logic  clk,
   input logic  rst_n,
@@ -50,6 +51,12 @@ module axi_lite_scratchpad #(
   localparam int unsigned AXI_ADDR_ALIGNMENT_p = $clog2((MEMORY_BW_p/8));
  
   logic [MEMORY_BW_p-1:0] ram_block [MEMORY_DEPTH_p];
+
+  `ifndef SIM
+  initial begin
+    $readmemh(MEM_FILE_p, ram_block);
+  end 
+  `endif
 
   logic [MEMORY_BW_p-1:0] s_ram_output_register;
   logic s_ram_output_register_used;
